@@ -1,0 +1,10 @@
+abosolute - is to use file with instructions as key
+if key in memory then depth is common for every bit
+depth is changeable
+otherwise depth is different and max depth can be configured 
+or even make it interactive( if program cant use -1 iterations
+then it will ask for a limit for one bit ( for example when both operations are shift rows))
+but if the key is file person should enter seconds one-time key or use gen-key for ciphering
+add justifying text in order to make its len equal to some num in square
+and add grid size 
+
