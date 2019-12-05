@@ -20,6 +20,8 @@ class Encoder:
         self.temp_grid = list()
         self.file_data = bytearray()
         self.output = str()
+        self.output_key = None
+        self.interactive = False
         """self.ops = {
             0:self.random_func,
             1:self.plus_op,

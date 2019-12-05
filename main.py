@@ -18,8 +18,12 @@ if __name__ == '__main__':
         elif args[i] == '-f':
             main_encoder.read_file(args[i + 1])
         elif args[i] == '-o':
-
-        elif args[i] == '--debug':
+            main_encoder.output = args[i + 1]
+        elif args[i] == '-O':
+            main_encoder.output_key = args[i + 1]
+        elif args[i] == '-i':
+            main_encoder.interactive = True
+        elif args[i] == '-D':
             debug = True
     if debug:
         main_encoder.fill_random_cells()
