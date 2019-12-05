@@ -1,4 +1,4 @@
-import math, random, copy, hashlib
+import math, random, copy, hashlib, logging, RandomClass
 
 
 class Encoder:
@@ -7,29 +7,53 @@ class Encoder:
     M_E_P_C = 2 ** 8
 
     def __init__(self):
-        self.random = random.Random()
-        self.random_gen = random.Random()
+        self.LOG = logging.getLogger()
+        self.LOG.setLevel(logging.DEBUG)
+        self.random = RandomClass.Random()
+        self.random_gen = RandomClass.Random()
         self.grid = list()
         self.grid_pos = 0
         self.attempts = list()
         self.max_depth = -1
+        self.min_num = 200
         self.stack = list()
+        self.temp_grid = list()
+        self.file_data = bytearray()
+        self.output = str()
+        """self.ops = {
+            0:self.random_func,
+            1:self.plus_op,
+            2:self.shift_rows,
+            3:self.goto_from_beg,
+            4:self.xor,
+            5:self.swap_cell,
+            6:self.if_false,
+            7:self.if_true,
+            8:self.plus_data,
+            9:self.xor_row,
+            10:self.swap_cols,
+            11:self.swap_rows,
+            12:self.goto_from_end,
+            13:self.xor_col,
+            14:self.xor,
+            15:self.random_func
+        }"""
         self.ops = {
-            0: self.random_func,
-            1: self.plus_op,
+            0: self.shift_rows,
+            1: self.shift_rows,
             2: self.shift_rows,
-            3: self.goto_from_beg,
+            3: self.xor,
             4: self.xor,
-            5: self.swap_cell,
-            6: self.if_false,
-            7: self.if_true,
+            5: self.xor,
+            6: self.plus_data,
+            7: self.plus_data,
             8: self.plus_data,
-            9: self.xor_row,
-            10: self.swap_cols,
-            11: self.swap_rows,
-            12: self.goto_from_end,
-            13: self.xor_col,
-            14: self.xor,
+            9: self.shift_rows,
+            10: self.shift_rows,
+            11: self.shift_rows,
+            12: self.shift_rows,
+            13: self.shift_rows,
+            14: self.random_func,
             15: self.random_func
         }
 
@@ -40,7 +64,7 @@ class Encoder:
         self.random.seed(key)
 
     def set_gen_key(self, key):
-        self.gen_random.seed(key)
+        self.random_gen.seed(key)
 
     def set_min_num(self, num):
         self.min_num = num
@@ -53,6 +77,8 @@ class Encoder:
     def read_file(self, file):
         with open(file, mode='rb') as f:
             self.text = f.read()
+        self.get_binary_text()
+        self.prepare_grid()
 
     def get_binary_text(self):
         self.binary_text = ''
@@ -78,8 +104,8 @@ class Encoder:
     def fill_random_cell(self, g_pos):
         t_ops = list(range(16)) * 4
         t_data = list(range(16)) * 4
-        random.shuffle(t_ops)
-        random.shuffle(t_data)
+        t_ops = self.random_gen.shuffle(t_ops)
+        t_data = self.random_gen.shuffle(t_data)
         for i in range(64):
             self.grid[g_pos][i // 8][i % 8] = self.set_op(self.grid[g_pos][i // 8][i % 8], t_ops[i])
             self.grid[g_pos][i // 8][i % 8] = self.set_data(self.grid[g_pos][i // 8][i % 8], t_data[i])
@@ -89,25 +115,57 @@ class Encoder:
             self.fill_random_cell(g_pos)
 
     def encode(self):
-        self.fill_random_cells()
-        for self.grid_pos in range(len(self.grid)):
-            self.complete_bit()
+        completed = False
+        while not completed:
+            self.temp_grid.clear()
+            self.attempts.clear()
+            for self.grid_pos in range(len(self.grid)):
+                self.copy_to_temp()
+                self.complete_bit()
+                completed = True
+        self.prepare_output()
+
+    def copy_to_temp(self):
+        for i in range(64):
+            self.temp_grid.append(self.grid[self.grid_pos][i // 8][i % 8])
+
+    def prepare_output(self):
+        temp = len(self.binary_text)
+        while temp > 254:
+            self.file_data.append(254)
+            temp -= 254
+        self.file_data.append(temp)
+        self.file_data.append(255)
+        for i in self.temp_grid:
+            self.file_data.append(i)
+        for i in self.attempts:
+            temp = i - self.min_num
+            while temp > 254:
+                self.file_data.append(254)
+                temp -= 254
+            self.file_data.append(temp)
+            self.file_data.append(255)
+
+    def save(self):
+        out = open(self.output, mode='wb+')
+        out.write(self.file_data)
 
     def complete_bit(self):
         attempt = 0
-        check = self.random.randint(0, 63)
-        while attempt < self.min_num or self.grid[self.grid_pos][check // 8][check % 8] & 1 != self.binary_text[
-            self.grid_pos]:
+        check = self.random.randint(0, 64)
+        while attempt < self.min_num or self.grid[self.grid_pos][check // 8][check % 8] & 1 != int(
+                self.binary_text[self.grid_pos]):
             attempt += 1
-            entry = self.random.randint(0, 63)
+            entry = self.random.randint(0, 64)
             self.func_handler(entry, 0)
             self.complete_func()
-            check = self.random.randint(0, 63)
+            check = self.random.randint(0, 64)
 
         self.attempts.append(attempt)
 
     def complete_func(self):
         while len(self.stack) > 0:
+            self.LOG.debug(f"main: {list(self.stack)}")
             temp = self.stack.pop()
             temp[0](temp[1], temp[2])
 
@@ -127,16 +185,24 @@ class Encoder:
                 data = self.get_data(self.grid[self.grid_pos][h][w])
                 next_pos = (pos + 1) % 64
                 t_list = list()
-                t_list.append(self.ops[op], next_pos, depth)
+                t_list.append(self.ops[op])
+                t_list.append(next_pos)
+                t_list.append(depth)
                 self.stack.append(t_list)
                 next_pos = (next_pos + 1) % 64
                 t_list = list()
-                t_list.append(self.ops[data], next_pos, depth)
+                t_list.append(self.ops[data])
+                t_list.append(next_pos)
+                t_list.append(depth)
                 self.stack.append(t_list)
+                self.LOG.debug(f"1: {op},{data},{list(t_list)},depth:{depth},{list(self.stack)}")
             else:
                 t_list = list()
-                t_list.append(self.ops[func], pos, depth)
+                t_list.append(self.ops[func])
+                t_list.append(pos)
+                t_list.append(depth)
                 self.stack.append(t_list)
+                self.LOG.debug(f"2:{list(t_list)},depth:{depth},{list(self.stack)}")
 
     def num_to_bin(self, num):
         return '{:0>8}'.format(bin(num)[2:])
