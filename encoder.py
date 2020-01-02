@@ -22,7 +22,7 @@ class Encoder:
         self.output = str()
         self.output_key = None
         self.interactive = False
-        """self.ops = {
+        self.ops = {
             0:self.random_func,
             1:self.plus_op,
             2:self.shift_rows,
@@ -39,26 +39,7 @@ class Encoder:
             13:self.xor_col,
             14:self.xor,
             15:self.random_func
-        }"""
-        self.ops = {
-            0: self.shift_rows,
-            1: self.shift_rows,
-            2: self.shift_rows,
-            3: self.xor,
-            4: self.xor,
-            5: self.xor,
-            6: self.plus_data,
-            7: self.plus_data,
-            8: self.plus_data,
-            9: self.shift_rows,
-            10: self.shift_rows,
-            11: self.shift_rows,
-            12: self.shift_rows,
-            13: self.shift_rows,
-            14: self.random_func,
-            15: self.random_func
         }
-
     def set_max_depth(self, depth):
         self.max_depth = depth
 
