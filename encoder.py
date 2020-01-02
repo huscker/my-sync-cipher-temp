@@ -44,7 +44,6 @@ class Encoder:
             15:self.random_func
         }
 
-
     def set_max_depth(self, depth):
         self.max_depth = depth
 
