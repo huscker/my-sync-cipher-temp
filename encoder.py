@@ -1,6 +1,7 @@
 import math, random, copy, hashlib, logging, RandomClass
 
 
+
 class Encoder:
     SIDE = 8
     GRID = SIDE ** 2
@@ -18,7 +19,7 @@ class Encoder:
         self.min_num = 200
         self.stack = list()
         self.temp_grid = list()
-        self.file_data = list()
+        self.file_data = bytearray()
         self.output = str()
         self.output_key_file = str()
         self.output_key_data = bytearray()
@@ -48,11 +49,11 @@ class Encoder:
         self.max_depth = depth
 
     def set_key(self, key):
-        self.random.seed(key)
+        self.random.seed(int(key))
         self.key = key
 
     def set_gen_key(self, key):
-        self.random_gen.seed(key)
+        self.random_gen.seed(int(key))
 
     def set_min_num(self, num):
         self.min_num = num
@@ -101,6 +102,8 @@ class Encoder:
                 if self.grid[self.grid_pos][i // 8][i % 8] & 1 != int(self.binary_text[self.grid_pos]):
                     s.append(str(i))
             print(f'check options: {",".join(s)}')
+        elif choice == 4:
+            print(self.grid)
 
     def fill_random_cell(self, g_pos):
         t_ops = list(range(16)) * 4
@@ -117,6 +120,8 @@ class Encoder:
 
     def encode(self):
         completed = False
+        self.fill_random_cells()
+        # self.print_grid(4)
         while not completed:
             self.temp_grid.clear()
             self.attempts.clear()
@@ -138,8 +143,10 @@ class Encoder:
             temp -= 254
         self.file_data.append(255)
         self.file_data.append(temp)
+
         for i in self.temp_grid:  ####################
             self.file_data.append(i)
+
         if self.interactive:
             self.output_key_data.insert(0, -1)
             self.output_key_data.insert(0, self.key)
@@ -149,8 +156,9 @@ class Encoder:
                 while temp > 254:
                     self.file_data.append(254)
                     temp -= 254
-                self.file_data.append(temp)
                 self.file_data.append(255)
+                self.file_data.append(temp)
+
 
     def save(self):
         if self.interactive:
@@ -177,18 +185,20 @@ class Encoder:
             self.output_key_data.append(-1)
         else:
             check = self.random.randint(0, 64)
+            print(check, self.grid[self.grid_pos])
             while attempt < self.min_num or self.grid[self.grid_pos][check // 8][check % 8] & 1 != int(
                     self.binary_text[self.grid_pos]):
                 attempt += 1
                 entry = self.random.randint(0, 64)
+                #print(entry, end=' ')
                 self.func_handler(entry, 0)
                 self.complete_func()
                 check = self.random.randint(0, 64)
-                self.attempts.append(attempt)
+            self.attempts.append(attempt)
 
     def complete_func(self):
         while len(self.stack) > 0:
-            self.LOG.debug(f"main: {list(self.stack)}")
+            #self.LOG.debug(f"main: {list(self.stack)}")
             temp = self.stack.pop()
             temp[0](temp[1], temp[2])
 
@@ -217,14 +227,14 @@ class Encoder:
                 t_list.append(next_pos)
                 t_list.append(depth)
                 self.stack.append(t_list)
-                self.LOG.debug(f"1: {op},{data},{list(t_list)},depth:{depth},{list(self.stack)}")
+                #self.LOG.debug(f"1: {op},{data},{list(t_list)},depth:{depth},{list(self.stack)}")
             else:
                 t_list = list()
                 t_list.append(self.ops[func])
                 t_list.append(pos)
                 t_list.append(depth)
                 self.stack.append(t_list)
-                self.LOG.debug(f"2:{list(t_list)},depth:{depth},{list(self.stack)}")
+                #self.LOG.debug(f"2:{list(t_list)},depth:{depth},{list(self.stack)}")
 
     def num_to_bin(self, num):
         return '{:0>8}'.format(bin(num)[2:])
@@ -282,9 +292,8 @@ class Encoder:
         w = pos % 8
         h2 = self.get_op(self.grid[self.grid_pos][h][w]) % 8
         w2 = self.get_data(self.grid[self.grid_pos][h][w]) % 8
-        num = random.randint(0, 255)
+        num = self.random.randint(0, 256)
         self.grid[self.grid_pos][h2][w2] ^= num
-
     def swap_rows(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
@@ -313,7 +322,7 @@ class Encoder:
     def if_true(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 15)
+        num = self.random.randint(0, 16)
         dat = self.get_data(self.grid[self.grid_pos][h][w])
         if (max(num, dat) + 1) % (min(num, dat) + 1) == 0:
             next_pos = pos + 1
@@ -327,7 +336,7 @@ class Encoder:
     def if_false(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 15)
+        num = self.random.randint(0, 16)
         dat = self.get_data(self.grid[self.grid_pos][h][w])
         if (max(num, dat) + 1) % (min(num, dat) + 1) == 0:
             next_pos = pos + 2
@@ -351,12 +360,12 @@ class Encoder:
         self.func_handler(next_pos, depth + 1)
 
     def random_func(self, pos, depth):
-        self.func_handler(pos, depth + 1, func=random.randint(0, 15))
+        self.func_handler(pos, depth + 1, func=self.random.randint(0, 16))
 
     def xor_row(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 255)
+        num = self.random.randint(0, 256)
         h2 = self.grid[self.grid_pos][h][w] % 8
         for i in range(8):
             self.grid[self.grid_pos][h2][i] ^= num
@@ -364,14 +373,7 @@ class Encoder:
     def xor_col(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 255)
+        num = self.random.randint(0, 256)
         w2 = self.grid[self.grid_pos][h][w] % 8
         for i in range(8):
             self.grid[self.grid_pos][i][w2] ^= num
-
-
-a = Encoder()
-a.set_text('h')
-a.testfill(0)
-a.grid[0][0][6] = 220
-print(a.get_data(220), a.get_op(220))

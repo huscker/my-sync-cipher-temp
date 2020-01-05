@@ -25,7 +25,5 @@ if __name__ == '__main__':
             main_encoder.interactive = True
         elif args[i] == '-D':
             debug = True
-    if debug:
-        main_encoder.fill_random_cells()
-        main_encoder.print_grid()
+
     main_encoder.encode()

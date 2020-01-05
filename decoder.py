@@ -16,6 +16,7 @@ class Decoder:
         self.output_file = str()
         self.decoded_bits = str()
         self.interactive = False
+        self.key = 12
         self.ops = {
             0: self.random_func,
             1: self.plus_op,
@@ -36,7 +37,6 @@ class Decoder:
         }
         self.args = args
         self.stack = list()
-        self.parse_args()
 
     def parse_args(self):
         for i in range(len(self.args)):
@@ -62,7 +62,7 @@ class Decoder:
 
     def parse_file(self, file):
         self.file_data = open(file, 'rb').read()
-        self.decode_file_data()
+
 
     def parse_input_file(self, file):
         self.file_input_data = open(file, 'r', encoding='utf8').read()
@@ -72,7 +72,10 @@ class Decoder:
             self.random = random.random()
             self.random.seed(self.key)
         elif int(num) == 2:
-            self.random == RandomClass.Random()
+            self.random = RandomClass.Random()
+            self.random.seed(int(self.key))
+        else:
+            self.random = RandomClass.Random()
             self.random.seed(int(self.key))
 
     def decode_file_data(self):
@@ -107,6 +110,7 @@ class Decoder:
                     for w in range(8):
                         self.grid[j][h].append(self.file_data[i + j * 64 + h * 8 + w])
             i += temp * 64
+
             while i < len(self.file_data):
                 temp = self.min_num
                 while self.file_data[i] != 255:
@@ -114,9 +118,10 @@ class Decoder:
                     i += 1
                 i += 1
                 temp += self.file_data[i]
+                i += 1
                 self.attempts.append(temp)
-
     def decode(self):
+        self.decode_file_data()
 
         if self.interactive:
             temp = self.file_input_data.split('-1')
@@ -135,20 +140,22 @@ class Decoder:
 
                 self.decoded_bits = self.decoded_bits + str(self.grid_pos[self.grid_pos][entry // 8][entry % 8] & 1)
                 self.grid_pos += 1
-            self.save()
 
 
 
         else:
             self.random_choice(self.random_ch)
             for self.grid_pos in range(len(self.grid)):
-                entry = self.random.randint(0, 64)
-                for attempt in range(len(self.attempts[self.grid_pos])):
+                check = self.random.randint(0, 64)
+                print(check, self.grid[self.grid_pos])
+                for attempt in range(self.attempts[self.grid_pos]):
                     entry = self.random.randint(0, 64)
+                    # print(entry,end=' ')
                     self.func_handler(entry, 0)
                     self.complete_func()
                     check = self.random.randint(0, 64)  # чтобы потрать random call
                 self.decoded_bits = self.decoded_bits + str(self.grid[self.grid_pos][check // 8][check % 8] & 1)
+        self.save()
 
     def save(self):
         out = bytearray()
@@ -156,7 +163,7 @@ class Decoder:
             out.append(int(self.decoded_bits[i * 8:i * 8 + 8], 2))
         f = open(self.output_file, mode='wb+')
         f.write(out)
-        out.close()
+        f.close()
 
     def complete_func(self):
         while len(self.stack) > 0:
@@ -246,7 +253,7 @@ class Decoder:
         w = pos % 8
         h2 = self.get_op(self.grid[self.grid_pos][h][w]) % 8
         w2 = self.get_data(self.grid[self.grid_pos][h][w]) % 8
-        num = random.randint(0, 255)
+        num = self.random.randint(0, 256)
         self.grid[self.grid_pos][h2][w2] ^= num
 
     def swap_rows(self, pos, depth):
@@ -277,7 +284,7 @@ class Decoder:
     def if_true(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 15)
+        num = self.random.randint(0, 16)
         dat = self.get_data(self.grid[self.grid_pos][h][w])
         if (max(num, dat) + 1) % (min(num, dat) + 1) == 0:
             next_pos = pos + 1
@@ -291,7 +298,7 @@ class Decoder:
     def if_false(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 15)
+        num = self.random.randint(0, 16)
         dat = self.get_data(self.grid[self.grid_pos][h][w])
         if (max(num, dat) + 1) % (min(num, dat) + 1) == 0:
             next_pos = pos + 2
@@ -315,12 +322,12 @@ class Decoder:
         self.func_handler(next_pos, depth + 1)
 
     def random_func(self, pos, depth):
-        self.func_handler(pos, depth + 1, func=random.randint(0, 15))
+        self.func_handler(pos, depth + 1, func=self.random.randint(0, 16))
 
     def xor_row(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 255)
+        num = self.random.randint(0, 256)
         h2 = self.grid[self.grid_pos][h][w] % 8
         for i in range(8):
             self.grid[self.grid_pos][h2][i] ^= num
@@ -328,7 +335,7 @@ class Decoder:
     def xor_col(self, pos, depth):
         h = (pos % 64) // 8
         w = pos % 8
-        num = random.randint(0, 255)
+        num = self.random.randint(0, 256)
         w2 = self.grid[self.grid_pos][h][w] % 8
         for i in range(8):
             self.grid[self.grid_pos][i][w2] ^= num
