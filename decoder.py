@@ -15,7 +15,6 @@ class Decoder:
         self.file_input_data = str()
         self.output_file = str()
         self.decoded_bits = str()
-        self.interactive = False
         self.key = 12
         self.ops = {
             0: self.random_func,
@@ -42,8 +41,6 @@ class Decoder:
         for i in range(len(self.args)):
             if self.args[i] == '-k':
                 self.key = self.args[i + 1]
-            elif self.args[i] == '-i':
-                self.interactive = True
             elif self.args[i] == '-I':
                 self.parse_input_file(self.args[i + 1])
             elif self.args[i] == '-f':
@@ -79,82 +76,44 @@ class Decoder:
             self.random.seed(int(self.key))
 
     def decode_file_data(self):
-        if self.interactive:
-            i = 0
-            temp = 0
-            while self.file_data[i] != 255:
-                temp += self.file_data[i]
-                i += 1
-            i += 1
+        i = 0
+        temp = 0
+        while self.file_data[i] != 255:
             temp += self.file_data[i]
             i += 1
-            for j in range(temp):
-                self.grid.append(list())
-                for h in range(8):
-                    self.grid[j].append(list())
-                    for w in range(8):
-                        self.grid[j][h].append(self.file_data[i + j * 64 + h * 8 + w])
-        else:
-            i = 0
-            temp = 0
-            while self.file_data[i] != 255:
-                temp += self.file_data[i]
-                i += 1
-            i += 1
-            temp += self.file_data[i]
-            i += 1
-            for j in range(temp):
-                self.grid.append(list())
-                for h in range(8):
-                    self.grid[j].append(list())
-                    for w in range(8):
-                        self.grid[j][h].append(self.file_data[i + j * 64 + h * 8 + w])
-            i += temp * 64
+        i += 1
+        temp += self.file_data[i]
+        i += 1
+        for j in range(temp):
+            self.grid.append(list())
+            for h in range(8):
+                self.grid[j].append(list())
+                for w in range(8):
+                    self.grid[j][h].append(self.file_data[i + j * 64 + h * 8 + w])
+        i += temp * 64
 
-            while i < len(self.file_data):
-                temp = self.min_num
-                while self.file_data[i] != 255:
-                    temp += self.file_data[i]
-                    i += 1
-                i += 1
+        while i < len(self.file_data):
+            temp = self.min_num
+            while self.file_data[i] != 255:
                 temp += self.file_data[i]
                 i += 1
-                self.attempts.append(temp)
+            i += 1
+            temp += self.file_data[i]
+            i += 1
+            self.attempts.append(temp)
     def decode(self):
         self.decode_file_data()
-
-        if self.interactive:
-            temp = self.file_input_data.split('-1')
-            self.key = temp[0]
-            self.random_choice(self.random_ch)
-            temp = temp[1:]
-            self.grid_pos = 0
-            for i in temp:
-                t = i.split(',')
-                entry = int(t[-1])
-                for j in range((len(t) - 1) // 2):
-                    entr = t[j * 2]
-                    self.max_depth = t[j * 2 + 1]
-                    self.func_handler(entry, 0)
-                    self.complete_func()
-
-                self.decoded_bits = self.decoded_bits + str(self.grid_pos[self.grid_pos][entry // 8][entry % 8] & 1)
-                self.grid_pos += 1
-
-
-
-        else:
-            self.random_choice(self.random_ch)
-            for self.grid_pos in range(len(self.grid)):
-                check = self.random.randint(0, 64)
-                print(check, self.grid[self.grid_pos])
-                for attempt in range(self.attempts[self.grid_pos]):
-                    entry = self.random.randint(0, 64)
-                    # print(entry,end=' ')
-                    self.func_handler(entry, 0)
-                    self.complete_func()
-                    check = self.random.randint(0, 64)  # чтобы потрать random call
-                self.decoded_bits = self.decoded_bits + str(self.grid[self.grid_pos][check // 8][check % 8] & 1)
+        self.random_choice(self.random_ch)
+        for self.grid_pos in range(len(self.grid)):
+            check = self.random.randint(0, 64)
+            print(check, self.grid[self.grid_pos])
+            for attempt in range(self.attempts[self.grid_pos]):
+                entry = self.random.randint(0, 64)
+                # print(entry,end=' ')
+                self.func_handler(entry, 0)
+                self.complete_func()
+                check = self.random.randint(0, 64)  # чтобы потрать random call
+            self.decoded_bits = self.decoded_bits + str(self.grid[self.grid_pos][check // 8][check % 8] & 1)
         self.save()
 
     def save(self):
