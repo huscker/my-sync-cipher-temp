@@ -1,4 +1,4 @@
-import math, random, copy, hashlib, logging, RandomClass
+import math, random, copy, hashlib, logging, RandomClass,argparse
 
 
 
@@ -7,8 +7,7 @@ class Encoder:
     GRID = SIDE ** 2
 
     def __init__(self):
-        self.LOG = logging.getLogger()
-        self.LOG.setLevel(logging.DEBUG)
+        self.parser = argparse.ArgumentParser(description='Block cipher encoder, that should be invulnerable to bruteforce.')
         self.random = RandomClass.Random()
         self.random_gen = RandomClass.Random()
         self.grid = list()
@@ -26,6 +25,8 @@ class Encoder:
         self.key = str()
         self.args = list()
         self.random_ch = 2
+        self.verbose = False
+        self.text = str()
         self.ops = {
             0:self.random_func,
             1:self.plus_op,
@@ -44,10 +45,41 @@ class Encoder:
             14:self.xor,
             15:self.random_func
         }
+        self.parser.add_argument('-v', '--verbose', help='prints info of all operations', action='store_true')
+        self.parser.add_argument('-d', '--depth', help='(advanced) sets recursion depth of algorithm, -1 = infinity,default = -1',
+                                 type=int, default=-1)
+        self.parser.add_argument('-n', '--num', help='(advanced) sets number of iterations per bit, default = 200',type=int,default=200)
+        self.parser.add_argument('-t', '--text', help='input text to be encoded',type=str)
+        self.parser.add_argument('-o', '--out',help='name of output file, default=encoded.txt',default='encoded.txt',type=str)
+        self.parser.add_argument('-i', '--input',help='name of input file to be encoded',type=str)
+        self.parser.add_argument('-r', '--randomizer',help='(advanced) sets random generator to encode text, 1 - Python random library, 2 - Mersenne Twister by yinengy, default =2',choices=[1,2],default=2)
+        self.parser.add_argument('-g', '--gen_key', help='(advanced) sets seed for first field generation')
+        self.parser.add_argument('-p', '--profile', help='sets automatically depth and num, depth=50*value, num=10*value,default=8',default=8,type=int)
+        self.parser.add_argument('key',help='key for cipher')
+        self.parser.add_argument('--version', help='prints version of script')
 
     def parse_args(self,args):
         self.args = args
-        for i in range(len(self.args)):
+        args = self.parser.parse_args(args[1:])
+        if args.version:
+            print('Encoder version: 1.0')
+            exit(0)
+        self.verbose = args.verbose
+        self.set_max_depth(args.depth)
+        self.set_key(args.key)
+        self.set_gen_key(args.gen_key)
+        self.set_min_num(args.num)
+        self.set_profile(args.profile)
+        self.output = args.out
+        self.random_ch = args.randomizer
+        if not args.input and not args.text:
+            print("No data to be encoded was provided")
+            exit(-1)
+        self.set_text(args.text)
+        self.read_file(args.input)
+
+        """
+                for i in range(len(self.args)):
             if self.args[i] == '-d':
                 self.set_max_depth(int(self.args[i + 1]))
             elif self.args[i] == '-k':
@@ -66,30 +98,44 @@ class Encoder:
                 self.output_key = self.args[i + 1]
             elif self.args[i] == '-r':
                 self.random_ch = int(self.args[i+1])
+        """
+        if self.verbose:
+            print('Arguments are parsed. Filling cells.')
+
+    def set_profile(self,profile):
+        if profile:
+            self.max_depth = 50*profile
+            self.min_num = 10*profile
 
     def set_max_depth(self, depth):
-        self.max_depth = depth
+        if depth:
+            self.max_depth = depth
 
     def set_key(self, key):
-        self.random.seed(int(key))
-        self.key = key
+        if key:
+            self.random.seed(int(key))
+            self.key = key
 
     def set_gen_key(self, key):
-        self.random_gen.seed(int(key))
+        if key:
+            self.random_gen.seed(int(key))
 
     def set_min_num(self, num):
-        self.min_num = num
+        if num:
+            self.min_num = num
 
     def set_text(self, text):
-        self.text = text.encode('utf8')
-        self.get_binary_text()
-        self.prepare_grid()
+        if text:
+            self.text = text.encode('utf8')
+            self.get_binary_text()
+            self.prepare_grid()
 
     def read_file(self, file):
-        with open(file, mode='rb') as f:
-            self.text = f.read()
-        self.get_binary_text()
-        self.prepare_grid()
+        if file:
+            with open(file, mode='rb') as f:
+                self.text = f.read()
+            self.get_binary_text()
+            self.prepare_grid()
 
     def get_binary_text(self):
         self.binary_text = ''
@@ -143,6 +189,8 @@ class Encoder:
     def encode(self):
         completed = False
         self.fill_random_cells()
+        if self.verbose:
+            print('Cells are filled.','Encoding started.',sep='\n')
         # self.print_grid(4)
         while not completed:
             self.temp_grid.clear()
@@ -150,9 +198,15 @@ class Encoder:
             for self.grid_pos in range(len(self.grid)):
                 self.copy_to_temp()
                 self.complete_bit()
-                completed = True
+                if self.verbose:
+                    print(f'Bit encoded. Progress: {round(float(self.grid_pos+1)/len(self.grid)*100)}%')
+            completed = True
         self.prepare_output()
+        if self.verbose:
+            print('Output prepared. Saving output.')
         self.save()
+        if self.verbose:
+            print('Output saved. Exiting.')
 
     def copy_to_temp(self):
         for i in range(64):
@@ -185,12 +239,10 @@ class Encoder:
     def complete_bit(self):
         attempt = 0
         check = self.random.randint(0, 64)
-        print(check, self.grid[self.grid_pos])
         while attempt < self.min_num or self.grid[self.grid_pos][check // 8][check % 8] & 1 != int(
                 self.binary_text[self.grid_pos]):
             attempt += 1
             entry = self.random.randint(0, 64)
-            # print(entry, end=' ')
             self.func_handler(entry, 0)
             self.complete_func()
             check = self.random.randint(0, 64)
@@ -198,7 +250,6 @@ class Encoder:
 
     def complete_func(self):
         while len(self.stack) > 0:
-            #self.LOG.debug(f"main: {list(self.stack)}")
             temp = self.stack.pop()
             temp[0](temp[1], temp[2])
 
@@ -227,14 +278,12 @@ class Encoder:
                 t_list.append(next_pos)
                 t_list.append(depth)
                 self.stack.append(t_list)
-                #self.LOG.debug(f"1: {op},{data},{list(t_list)},depth:{depth},{list(self.stack)}")
             else:
                 t_list = list()
                 t_list.append(self.ops[func])
                 t_list.append(pos)
                 t_list.append(depth)
                 self.stack.append(t_list)
-                #self.LOG.debug(f"2:{list(t_list)},depth:{depth},{list(self.stack)}")
 
     def num_to_bin(self, num):
         return '{:0>8}'.format(bin(num)[2:])
@@ -378,6 +427,4 @@ class Encoder:
         for i in range(8):
             self.grid[self.grid_pos][i][w2] ^= num
 
-a = Encoder()
-a.set_text('t')
-a.testfill(0)
+

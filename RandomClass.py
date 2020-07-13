@@ -1,3 +1,4 @@
+# https://github.com/yinengy/Mersenne-Twister-in-Python
 class Random():
     def __init__(self, c_seed=0):
         # MT19937

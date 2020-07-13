@@ -1,8 +1,10 @@
-import random, RandomClass
+import random, RandomClass,argparse
 
 
 class Decoder:
-    def __init__(self, args):
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(description='Block cipher decoder, that should be invulnerable to bruteforce.')
+        self.random = RandomClass.Random()
         self.random_ch = 2
         self.grid = list()
         self.grid_pos = 0
@@ -34,11 +36,42 @@ class Decoder:
             14: self.xor,
             15: self.random_func
         }
-        self.args = args
         self.stack = list()
+        self.parser.add_argument('-v', '--verbose', help='prints info of all operations', action='store_true')
+        self.parser.add_argument('-d', '--depth',
+                                 help='(advanced) sets recursion depth of algorithm, -1 = infinity,default = -1',
+                                 type=int, default=-1)
+        self.parser.add_argument('-n', '--num', help='(advanced) sets number of iterations per bit, default = 200',
+                                 type=int, default=200)
+        self.parser.add_argument('-o', '--out', help='name of output file, default=decoded.txt', default='decoded.txt',
+                                 type=str)
+        self.parser.add_argument('-i', '--input', help='name of input file to be encoded, default=encoded.txt',default='encoded.txt',type=str)
+        self.parser.add_argument('-r', '--randomizer',
+                                 help='(advanced) sets random generator to encode text, 1 - Python random library, 2 - Mersenne Twister by yinengy, default =2',
+                                 choices=[1, 2], default=2)
+        self.parser.add_argument('-p', '--profile', help='sets automatically depth and num, depth=50*value, num=10*value,default=8',default=8,type=int)
+        self.parser.add_argument('key', help='key for cipher')
+        self.parser.add_argument('--version', help='prints version of script')
 
-    def parse_args(self):
-        for i in range(len(self.args)):
+    def parse_args(self,args):
+        self.args = args
+        args = self.parser.parse_args(args[1:])
+        if args.version:
+            print('Decoder version: 1.0')
+            exit(0)
+        self.verbose = args.verbose
+        self.set_max_depth(args.depth)
+        self.set_key(args.key)
+        self.set_min_num(args.num)
+        self.set_profile(args.profile)
+        self.output_file = args.out
+        self.random_ch = args.randomizer
+        if not args.input:
+            print("No data to be decoded was provided")
+            exit(-1)
+        self.parse_file(args.input)
+        """
+                for i in range(len(self.args)):
             if self.args[i] == '-k':
                 self.key = self.args[i + 1]
             elif self.args[i] == '-I':
@@ -53,16 +86,34 @@ class Decoder:
                 self.random_ch = self.args[i + 1]
             elif self.args[i] == '-o':
                 self.output_file = self.args[i + 1]
+        """
+        if self.verbose:
+            print('Arguments are parsed. Parsing file.')
 
     # key file - file_input_data
     # file - filedata
 
+    def set_profile(self,profile):
+        if profile:
+            self.max_depth = 50*profile
+            self.min_num = 10*profile
+
+    def set_max_depth(self, depth):
+        if depth:
+            self.max_depth = depth
+
+    def set_key(self, key):
+        if key:
+            self.random.seed(int(key))
+            self.key = key
+
+    def set_min_num(self, num):
+        if num:
+            self.min_num = num
+
     def parse_file(self, file):
         self.file_data = open(file, 'rb').read()
 
-
-    def parse_input_file(self, file):
-        self.file_input_data = open(file, 'r', encoding='utf8').read()
 
     def random_choice(self, num):
         if int(num) == 1:
@@ -104,18 +155,24 @@ class Decoder:
     def decode(self):
         self.decode_file_data()
         self.random_choice(self.random_ch)
+        if self.verbose:
+            print('File parsed. Starting decoding.')
         for self.grid_pos in range(len(self.grid)):
             check = self.random.randint(0, 64)
-            print(check, self.grid[self.grid_pos])
             for attempt in range(self.attempts[self.grid_pos]):
                 entry = self.random.randint(0, 64)
                 # print(entry,end=' ')
                 self.func_handler(entry, 0)
                 self.complete_func()
                 check = self.random.randint(0, 64)  # чтобы потрать random call
+            if self.verbose:
+                print(f'Bit decoded. Progress: {round(float(self.grid_pos+1)/len(self.grid)*100)}%')
             self.decoded_bits = self.decoded_bits + str(self.grid[self.grid_pos][check // 8][check % 8] & 1)
+        if self.verbose:
+            print('Saving output.')
         self.save()
-
+        if self.verbose:
+            print('Output saved. Exiting.')
     def save(self):
         out = bytearray()
         for i in range(len(self.decoded_bits) // 8):
