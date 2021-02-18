@@ -5,6 +5,17 @@ import math, random, copy, hashlib, logging, RandomClass,argparse
 class Encoder:
     SIDE = 8
     GRID = SIDE ** 2
+    '''
+    -d 300
+    -D 700
+    -n 150
+    -N 1000
+    -g 12317236123
+    -i input2.txt
+    -o output.txt
+    -v
+    81726354
+    '''
 
     def __init__(self):
         self.parser = argparse.ArgumentParser(description='Block cipher encoder, that should be invulnerable to bruteforce.')
@@ -14,6 +25,7 @@ class Encoder:
         self.grid_pos = 0
         self.attempts = list()
         self.max_depth = -1
+        self.cur_depth = 0
         self.min_num = 200
         self.stack = list()
         self.temp_grid = list()
@@ -22,7 +34,7 @@ class Encoder:
         self.output_key_file = str()
         self.output_key_data = bytearray()
         self.binary_text = str()
-        self.key = str()
+        self.key = int()
         self.args = list()
         self.random_ch = 2
         self.verbose = False
@@ -46,15 +58,20 @@ class Encoder:
             15:self.random_func
         }
         self.parser.add_argument('-v', '--verbose', help='prints info of all operations', action='store_true')
-        self.parser.add_argument('-d', '--depth', help='(advanced) sets recursion depth of algorithm, -1 = infinity,default = -1',
+        self.parser.add_argument('-d','--min-depth',help='sets minimum boundary for depth value, default = 40',type=int,default=40)
+        self.parser.add_argument('-D','--max-depth',help='sets maximum boundary for depth value, default = 10000', type=int,default=10000)
+        self.parser.add_argument('-n','--min_num',help='sets minimum boundary for number of iterations per bit, default = 50',type=int,default=50)
+        self.parser.add_argument('-N', '--max_num',
+                                 help='sets maximum boundary for number of iterations per bit, default = 300', type=int,
+                                 default=300)
+        self.parser.add_argument('--depth', help='(advanced) sets recursion depth of algorithm, -1 = infinity,default = -1',
                                  type=int, default=-1)
-        self.parser.add_argument('-n', '--num', help='(advanced) sets number of iterations per bit, default = 200',type=int,default=200)
+        self.parser.add_argument('--num', help='(advanced) sets number of iterations per bit, default = 200',type=int,default=200)
         self.parser.add_argument('-t', '--text', help='input text to be encoded',type=str)
         self.parser.add_argument('-o', '--out',help='name of output file, default=encoded.txt',default='encoded.txt',type=str)
         self.parser.add_argument('-i', '--input',help='name of input file to be encoded',type=str)
         self.parser.add_argument('-r', '--randomizer',help='(advanced) sets random generator to encode text, 1 - Python random library, 2 - Mersenne Twister by yinengy, default =2',choices=[1,2],default=2)
         self.parser.add_argument('-g', '--gen_key', help='(advanced) sets seed for first field generation')
-        self.parser.add_argument('-p', '--profile', help='sets automatically depth and num, depth=50*value, num=10*value,default=8',default=8,type=int)
         self.parser.add_argument('key',help='key for cipher')
         self.parser.add_argument('--version', help='prints version of script')
 
@@ -62,14 +79,13 @@ class Encoder:
         self.args = args
         args = self.parser.parse_args(args[1:])
         if args.version:
-            print('Encoder version: 1.0')
+            print('Encoder version: 1.1')
             exit(0)
         self.verbose = args.verbose
-        self.set_max_depth(args.depth)
+        self.set_max_depth(args.depth,(args.min_depth,args.max_depth))
         self.set_key(args.key)
         self.set_gen_key(args.gen_key)
-        self.set_min_num(args.num)
-        self.set_profile(args.profile)
+        self.set_min_num(args.num,(args.min_num,args.max_num))
         self.output = args.out
         self.random_ch = args.randomizer
         if not args.input and not args.text:
@@ -77,39 +93,14 @@ class Encoder:
             exit(-1)
         self.set_text(args.text)
         self.read_file(args.input)
-
-        """
-                for i in range(len(self.args)):
-            if self.args[i] == '-d':
-                self.set_max_depth(int(self.args[i + 1]))
-            elif self.args[i] == '-k':
-                self.set_key(self.args[i + 1])
-            elif self.args[i] == '-g':
-                self.set_gen_key(self.args[i + 1])
-            elif self.args[i] == '-m':
-                self.set_min_num(int(self.args[i + 1]))
-            elif self.args[i] == '-t':
-                self.set_text(self.args[i + 1])
-            elif self.args[i] == '-f':
-                self.read_file(self.args[i + 1])
-            elif self.args[i] == '-o':
-                self.output = self.args[i + 1]
-            elif self.args[i] == '-O':
-                self.output_key = self.args[i + 1]
-            elif self.args[i] == '-r':
-                self.random_ch = int(self.args[i+1])
-        """
         if self.verbose:
             print('Arguments are parsed. Filling cells.')
 
-    def set_profile(self,profile):
-        if profile:
-            self.max_depth = 50*profile
-            self.min_num = 10*profile
-
-    def set_max_depth(self, depth):
+    def set_max_depth(self, depth,bounds):
         if depth:
             self.max_depth = depth
+        else:
+            self.max_depth = self.random.randint(min(abs(bounds[0]),abs(bounds[1])),max(abs(bounds[0]),abs(bounds[1])))
 
     def set_key(self, key):
         if key:
@@ -120,9 +111,11 @@ class Encoder:
         if key:
             self.random_gen.seed(int(key))
 
-    def set_min_num(self, num):
+    def set_min_num(self, num,bounds):
         if num:
             self.min_num = num
+        else:
+            self.min_num = self.random.randint(min(abs(bounds[0]),abs(bounds[1])),max(abs(bounds[0]),abs(bounds[1])))
 
     def set_text(self, text):
         if text:
@@ -243,7 +236,8 @@ class Encoder:
                 self.binary_text[self.grid_pos]):
             attempt += 1
             entry = self.random.randint(0, 64)
-            self.func_handler(entry, 0)
+            self.cur_depth = 0
+            self.func_handler(entry)
             self.complete_func()
             check = self.random.randint(0, 64)
         self.attempts.append(attempt)
@@ -251,39 +245,44 @@ class Encoder:
     def complete_func(self):
         while len(self.stack) > 0:
             temp = self.stack.pop()
-            temp[0](temp[1], temp[2])
+            temp[0](temp[1])
 
     def testfill(self, g_pos):
         for i in range(64):
             self.grid[g_pos][i // 8][i % 8] = i
 
     # cipher funcs
-    def func_handler(self, pos, depth, func=None):  #
-        if self.max_depth == -1 or depth <= self.max_depth:
+    def func_handler(self, pos, func=None):  #
+        if self.max_depth == -1 or self.cur_depth <= self.max_depth:
             h = (pos % 64) // 8
             w = pos % 8
-            depth += 1
+            self.cur_depth += 1
             if func is None:
                 op = self.get_op(self.grid[self.grid_pos][h][w])
                 data = self.get_data(self.grid[self.grid_pos][h][w])
+                self.stack.append([self.ops[op], (pos + 1) % 64])
+                self.stack.append([self.ops[data], (pos + 2) % 64])
+                '''
                 next_pos = (pos + 1) % 64
                 t_list = list()
                 t_list.append(self.ops[op])
                 t_list.append(next_pos)
-                t_list.append(depth)
                 self.stack.append(t_list)
-                next_pos = (next_pos + 1) % 64
-                t_list = list()
+                
+                next_pos = (pos + 2) % 64
+                t_list.clear()
                 t_list.append(self.ops[data])
                 t_list.append(next_pos)
-                t_list.append(depth)
                 self.stack.append(t_list)
+                
             else:
                 t_list = list()
                 t_list.append(self.ops[func])
                 t_list.append(pos)
-                t_list.append(depth)
                 self.stack.append(t_list)
+            '''
+            else:
+                self.stack.append([self.ops[func],pos])
 
     def num_to_bin(self, num):
         return '{:0>8}'.format(bin(num)[2:])
@@ -314,11 +313,11 @@ class Encoder:
         t[7] = t2[7]
         return int(''.join(t), 2)
 
-    def shift_rows(self, pos, depth):
+    def shift_rows(self, pos):
         for h in range(8):
             self.grid[self.grid_pos][h] = self.grid[self.grid_pos][h][h:] + self.grid[self.grid_pos][h][:h]
 
-    def plus_op(self, pos, depth):
+    def plus_op(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         t = self.get_op(self.grid[self.grid_pos][h][w])
@@ -327,7 +326,7 @@ class Encoder:
             t -= 16
         self.grid[self.grid_pos][h][w] = self.set_op(self.grid[self.grid_pos][h][w], t)
 
-    def plus_data(self, pos, depth):
+    def plus_data(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         t = self.get_data(self.grid[self.grid_pos][h][w])
@@ -336,14 +335,14 @@ class Encoder:
             t -= 16
         self.grid[self.grid_pos][h][w] = self.set_data(self.grid[self.grid_pos][h][w], t)
 
-    def xor(self, pos, depth): # ATTENTION WEIRD FUNC
+    def xor(self, pos): # ATTENTION WEIRD FUNC
         h = (pos % 64) // 8
         w = pos % 8
         h2 = self.get_op(self.grid[self.grid_pos][h][w]) % 8
         w2 = self.get_data(self.grid[self.grid_pos][h][w]) % 8
         num = self.random.randint(0, 256)
         self.grid[self.grid_pos][h2][w2] ^= num
-    def swap_rows(self, pos, depth):
+    def swap_rows(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         h1 = self.get_op(self.grid[self.grid_pos][h][w]) % 8
@@ -351,7 +350,7 @@ class Encoder:
         self.grid[self.grid_pos][h1], self.grid[self.grid_pos][h2] = self.grid[self.grid_pos][h2], \
                                                                      self.grid[self.grid_pos][h1]
 
-    def swap_cols(self, pos, depth):
+    def swap_cols(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         w1 = self.get_data(self.grid[self.grid_pos][h][w]) % 8
@@ -360,7 +359,7 @@ class Encoder:
             self.grid[self.grid_pos][i][w1], self.grid[self.grid_pos][i][w2] = self.grid[self.grid_pos][i][w2], \
                                                                                self.grid[self.grid_pos][i][w1]
 
-    def swap_cell(self, pos, depth):
+    def swap_cell(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         h2 = self.get_op(self.grid[self.grid_pos][h][w]) % 8
@@ -368,7 +367,7 @@ class Encoder:
         self.grid[self.grid_pos][h][w], self.grid[self.grid_pos][h2][w2] = self.grid[self.grid_pos][h2][w2], \
                                                                            self.grid[self.grid_pos][h][w]
 
-    def if_true(self, pos, depth):
+    def if_true(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         num = self.random.randint(0, 16)
@@ -376,13 +375,13 @@ class Encoder:
         if (max(num, dat) + 1) % (min(num, dat) + 1) == 0:
             next_pos = pos + 1
             next_pos = next_pos % 64
-            self.func_handler(next_pos, depth + 1)
+            self.func_handler(next_pos)
         else:
             next_pos = pos + 2
             next_pos = next_pos % 64
-            self.func_handler(next_pos, depth + 1)
+            self.func_handler(next_pos)
 
-    def if_false(self, pos, depth):
+    def if_false(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         num = self.random.randint(0, 16)
@@ -390,28 +389,28 @@ class Encoder:
         if (max(num, dat) + 1) % (min(num, dat) + 1) == 0:
             next_pos = pos + 2
             next_pos = next_pos % 64
-            self.func_handler(next_pos, depth + 1)
+            self.func_handler(next_pos)
         else:
             next_pos = pos + 1
             next_pos = next_pos % 64
-            self.func_handler(next_pos, depth + 1)
+            self.func_handler(next_pos)
 
-    def goto_from_beg(self, pos, depth):
+    def goto_from_beg(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         next_pos = self.grid[self.grid_pos][h][w] % 64
-        self.func_handler(next_pos, depth + 1)
+        self.func_handler(next_pos)
 
-    def goto_from_end(self, pos, depth):
+    def goto_from_end(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         next_pos = 63 - self.grid[self.grid_pos][h][w] % 64
-        self.func_handler(next_pos, depth + 1)
+        self.func_handler(next_pos)
 
-    def random_func(self, pos, depth):
-        self.func_handler(pos, depth + 1, func=self.random.randint(0, 16))
+    def random_func(self, pos):
+        self.func_handler(pos, func=self.random.randint(0, 16))
 
-    def xor_row(self, pos, depth):
+    def xor_row(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         num = self.random.randint(0, 256)
@@ -419,7 +418,7 @@ class Encoder:
         for i in range(8):
             self.grid[self.grid_pos][h2][i] ^= num
 
-    def xor_col(self, pos, depth):
+    def xor_col(self, pos):
         h = (pos % 64) // 8
         w = pos % 8
         num = self.random.randint(0, 256)
