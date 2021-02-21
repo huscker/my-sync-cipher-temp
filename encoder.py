@@ -1,6 +1,6 @@
 import math, random, copy, hashlib, logging, RandomClass,argparse
 
-
+# TODO : add random_ch function
 
 class Encoder:
     SIDE = 8
@@ -64,9 +64,9 @@ class Encoder:
         self.parser.add_argument('-N', '--max_num',
                                  help='sets maximum boundary for number of iterations per bit, default = 300', type=int,
                                  default=300)
-        self.parser.add_argument('--depth', help='(advanced) sets recursion depth of algorithm, -1 = infinity,default = -1',
-                                 type=int, default=-1)
-        self.parser.add_argument('--num', help='(advanced) sets number of iterations per bit, default = 200',type=int,default=200)
+        self.parser.add_argument('--depth', help='(advanced) sets recursion depth of algorithm, -1 = infinity',
+                                 type=int, default=-2)
+        self.parser.add_argument('--num', help='(advanced) sets number of iterations per bit',type=int,default=-2)
         self.parser.add_argument('-t', '--text', help='input text to be encoded',type=str)
         self.parser.add_argument('-o', '--out',help='name of output file, default=encoded.txt',default='encoded.txt',type=str)
         self.parser.add_argument('-i', '--input',help='name of input file to be encoded',type=str)
@@ -97,11 +97,10 @@ class Encoder:
             print('Arguments are parsed. Filling cells.')
 
     def set_max_depth(self, depth,bounds):
-        if depth:
+        if depth != -2:
             self.max_depth = depth
         else:
             self.max_depth = self.random.randint(min(abs(bounds[0]),abs(bounds[1])),max(abs(bounds[0]),abs(bounds[1])))
-
     def set_key(self, key):
         if key:
             self.random.seed(int(key))
@@ -112,7 +111,7 @@ class Encoder:
             self.random_gen.seed(int(key))
 
     def set_min_num(self, num,bounds):
-        if num:
+        if num != -2:
             self.min_num = num
         else:
             self.min_num = self.random.randint(min(abs(bounds[0]),abs(bounds[1])),max(abs(bounds[0]),abs(bounds[1])))
@@ -184,7 +183,6 @@ class Encoder:
         self.fill_random_cells()
         if self.verbose:
             print('Cells are filled.','Encoding started.',sep='\n')
-        # self.print_grid(4)
         while not completed:
             self.temp_grid.clear()
             self.attempts.clear()

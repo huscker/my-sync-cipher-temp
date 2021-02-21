@@ -2,6 +2,17 @@ import random, RandomClass,argparse
 
 
 class Decoder:
+    '''
+    -d 300
+    -D 700
+    -n 150
+    -N 1000
+    -g 12317236123
+    -i input2.txt
+    -o output.txt
+    -v
+    81726354
+    '''
     def __init__(self):
         self.parser = argparse.ArgumentParser(description='Block cipher decoder, that should be invulnerable to bruteforce.')
         self.random = RandomClass.Random()
@@ -50,10 +61,10 @@ class Decoder:
                                  help='sets maximum boundary for number of iterations per bit, default = 300', type=int,
                                  default=300)
         self.parser.add_argument('--depth',
-                                 help='(advanced) sets recursion depth of algorithm, -1 = infinity,default = -1',
-                                 type=int, default=-1)
-        self.parser.add_argument('--num', help='(advanced) sets number of iterations per bit, default = 200',
-                                 type=int, default=200)
+                                 help='(advanced) sets recursion depth of algorithm, -1 = infinity',
+                                 type=int, default=-2)
+        self.parser.add_argument('--num', help='(advanced) sets number of iterations per bit',
+                                 type=int, default=-2)
         self.parser.add_argument('-o', '--out', help='name of output file, default=decoded.txt', default='decoded.txt',
                                  type=str)
         self.parser.add_argument('-i', '--input', help='name of input file to be encoded, default=encoded.txt',default='encoded.txt',type=str)
@@ -69,12 +80,13 @@ class Decoder:
         if args.version:
             print('Decoder version: 1.1')
             exit(0)
+        self.random_ch = args.randomizer
+        self.random_choice(self.random_ch)
         self.verbose = args.verbose
         self.set_max_depth(args.depth,(args.min_depth,args.max_depth))
         self.set_key(args.key)
         self.set_min_num(args.num,(args.min_num,args.max_num))
         self.output_file = args.out
-        self.random_ch = args.randomizer
         if not args.input:
             print("No data to be decoded was provided")
             exit(-1)
@@ -103,7 +115,7 @@ class Decoder:
     # file - filedata
 
     def set_max_depth(self, depth,bounds):
-        if depth:
+        if depth != -2:
             self.max_depth = depth
         else:
             self.max_depth = self.random.randint(min(abs(bounds[0]),abs(bounds[1])),max(abs(bounds[0]),abs(bounds[1])))
@@ -114,7 +126,7 @@ class Decoder:
             self.key = key
 
     def set_min_num(self, num,bounds):
-        if num:
+        if num != -2:
             self.min_num = num
         else:
             self.min_num = self.random.randint(min(abs(bounds[0]),abs(bounds[1])),max(abs(bounds[0]),abs(bounds[1])))
@@ -162,14 +174,12 @@ class Decoder:
             self.attempts.append(temp)
     def decode(self):
         self.decode_file_data()
-        self.random_choice(self.random_ch)
         if self.verbose:
             print('File parsed. Starting decoding.')
         for self.grid_pos in range(len(self.grid)):
             check = self.random.randint(0, 64)
             for attempt in range(self.attempts[self.grid_pos]):
                 entry = self.random.randint(0, 64)
-                # print(entry,end=' ')
                 self.cur_depth = 0
                 self.func_handler(entry)
                 self.complete_func()
