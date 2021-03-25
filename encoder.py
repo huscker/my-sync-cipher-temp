@@ -1,32 +1,23 @@
-import math, random, copy, hashlib, logging, RandomClass,argparse
+import RandomClass,argparse
 
-# TODO : add random_ch function
+# TODO : add   arguments limits
 
 class Encoder:
     SIDE = 8
     GRID = SIDE ** 2
-    '''
-    -d 300
-    -D 700
-    -n 150
-    -N 1000
-    -g 12317236123
-    -i input2.txt
-    -o output.txt
-    -v
-    81726354
-    '''
 
     def __init__(self):
-        self.parser = argparse.ArgumentParser(description='Block cipher encoder, that should be invulnerable to bruteforce.')
+        self.parser = argparse.ArgumentParser(description='Block cipher encoder, that is invulnerable to bruteforce.')
         self.random = RandomClass.Random()
         self.random_gen = RandomClass.Random()
         self.grid = list()
         self.grid_pos = 0
         self.attempts = list()
         self.max_depth = -1
+        self.max_depth_boundaries = (40,10000)
         self.cur_depth = 0
         self.min_num = 200
+        self.min_num_boundaries = (50,300)
         self.stack = list()
         self.temp_grid = list()
         self.file_data = bytearray()
@@ -36,7 +27,6 @@ class Encoder:
         self.binary_text = str()
         self.key = int()
         self.args = list()
-        self.random_ch = 2
         self.verbose = False
         self.text = str()
         self.ops = {
@@ -70,7 +60,6 @@ class Encoder:
         self.parser.add_argument('-t', '--text', help='input text to be encoded',type=str)
         self.parser.add_argument('-o', '--out',help='name of output file, default=encoded.txt',default='encoded.txt',type=str)
         self.parser.add_argument('-i', '--input',help='name of input file to be encoded',type=str)
-        self.parser.add_argument('-r', '--randomizer',help='(advanced) sets random generator to encode text, 1 - Python random library, 2 - Mersenne Twister by yinengy, default =2',choices=[1,2],default=2)
         self.parser.add_argument('-g', '--gen_key', help='(advanced) sets seed for first field generation')
         self.parser.add_argument('key',help='key for cipher')
         self.parser.add_argument('--version', help='prints version of script')
@@ -79,15 +68,17 @@ class Encoder:
         self.args = args
         args = self.parser.parse_args(args[1:])
         if args.version:
-            print('Encoder version: 1.1')
+            print('Encoder version: 2.0')
             exit(0)
         self.verbose = args.verbose
-        self.set_max_depth(args.depth,(args.min_depth,args.max_depth))
+        self.random = RandomClass.Random()
         self.set_key(args.key)
+        self.set_max_depth(args.depth,(args.min_depth,args.max_depth))
+        self.max_depth_boundaries = (args.min_depth,args.max_depth)
+        self.set_min_num(args.num, (args.min_num, args.max_num))
+        self.min_num_boundaries = (args.min_num, args.max_num)
         self.set_gen_key(args.gen_key)
-        self.set_min_num(args.num,(args.min_num,args.max_num))
         self.output = args.out
-        self.random_ch = args.randomizer
         if not args.input and not args.text:
             print("No data to be encoded was provided")
             exit(-1)
@@ -179,19 +170,16 @@ class Encoder:
             self.fill_random_cell(g_pos)
 
     def encode(self):
-        completed = False
         self.fill_random_cells()
         if self.verbose:
             print('Cells are filled.','Encoding started.',sep='\n')
-        while not completed:
-            self.temp_grid.clear()
-            self.attempts.clear()
-            for self.grid_pos in range(len(self.grid)):
-                self.copy_to_temp()
-                self.complete_bit()
-                if self.verbose:
-                    print(f'Bit encoded. Progress: {round(float(self.grid_pos+1)/len(self.grid)*100)}%')
-            completed = True
+        self.temp_grid.clear()
+        self.attempts.clear()
+        for self.grid_pos in range(len(self.grid)):
+            self.copy_to_temp()
+            self.complete_bit()
+            if self.verbose:
+                print(f'Bit encoded. Progress: {round(float(self.grid_pos + 1) / len(self.grid) * 100)}%')
         self.prepare_output()
         if self.verbose:
             print('Output prepared. Saving output.')
@@ -204,16 +192,45 @@ class Encoder:
             self.temp_grid.append(self.grid[self.grid_pos][i // 8][i % 8])
 
     def prepare_output(self):
+        # min depth
+        temp = self.max_depth_boundaries[0]
+        while temp > 254:
+            self.file_data.append(254)
+            temp -= 254
+        self.file_data.append(255)
+        self.file_data.append(temp)
+        # max depth
+        temp = self.max_depth_boundaries[1]
+        while temp > 254:
+            self.file_data.append(254)
+            temp -= 254
+        self.file_data.append(255)
+        self.file_data.append(temp)
+        # min num
+        temp = self.min_num_boundaries[0]
+        while temp > 254:
+            self.file_data.append(254)
+            temp -= 254
+        self.file_data.append(255)
+        self.file_data.append(temp)
+        #max num
+        temp = self.min_num_boundaries[1]
+        while temp > 254:
+            self.file_data.append(254)
+            temp -= 254
+        self.file_data.append(255)
+        self.file_data.append(temp)
+        #len of textна
         temp = len(self.binary_text)
         while temp > 254:
             self.file_data.append(254)
             temp -= 254
         self.file_data.append(255)
         self.file_data.append(temp)
-
-        for i in self.temp_grid:  ####################
+        #grid
+        for i in self.temp_grid:
             self.file_data.append(i)
-
+        #instructions
         for i in self.attempts:
             temp = i - self.min_num
             while temp > 254:
@@ -227,6 +244,7 @@ class Encoder:
         out = open(self.output, mode='wb+')
         out.write(self.file_data)
         out.close()
+
     def complete_bit(self):
         attempt = 0
         check = self.random.randint(0, 64)
@@ -260,25 +278,6 @@ class Encoder:
                 data = self.get_data(self.grid[self.grid_pos][h][w])
                 self.stack.append([self.ops[op], (pos + 1) % 64])
                 self.stack.append([self.ops[data], (pos + 2) % 64])
-                '''
-                next_pos = (pos + 1) % 64
-                t_list = list()
-                t_list.append(self.ops[op])
-                t_list.append(next_pos)
-                self.stack.append(t_list)
-                
-                next_pos = (pos + 2) % 64
-                t_list.clear()
-                t_list.append(self.ops[data])
-                t_list.append(next_pos)
-                self.stack.append(t_list)
-                
-            else:
-                t_list = list()
-                t_list.append(self.ops[func])
-                t_list.append(pos)
-                self.stack.append(t_list)
-            '''
             else:
                 self.stack.append([self.ops[func],pos])
 

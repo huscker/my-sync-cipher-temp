@@ -6,4 +6,4 @@ def f():
     main_decoder.decode()
 
 if __name__ == '__main__':
-    print(timeit.timeit(f, number=1))
+    print('It took',timeit.timeit(f, number=1),'seconds')

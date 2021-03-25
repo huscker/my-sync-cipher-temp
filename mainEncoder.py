@@ -6,4 +6,4 @@ def f():
     main_encoder.parse_args(sys.argv)
     main_encoder.encode()
 if __name__ == '__main__':
-    print(timeit.timeit(f,number=1))
+    print('It took',timeit.timeit(f,number=1),'seconds')

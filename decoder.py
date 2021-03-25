@@ -1,22 +1,11 @@
-import random, RandomClass,argparse
+import RandomClass,argparse
 
+# TODO: remove arg parse of boundaries, arguments limits
 
 class Decoder:
-    '''
-    -d 300
-    -D 700
-    -n 150
-    -N 1000
-    -g 12317236123
-    -i input2.txt
-    -o output.txt
-    -v
-    81726354
-    '''
     def __init__(self):
         self.parser = argparse.ArgumentParser(description='Block cipher decoder, that should be invulnerable to bruteforce.')
         self.random = RandomClass.Random()
-        self.random_ch = 2
         self.grid = list()
         self.grid_pos = 0
         self.attempts = list()
@@ -50,27 +39,9 @@ class Decoder:
         }
         self.stack = list()
         self.parser.add_argument('-v', '--verbose', help='prints info of all operations', action='store_true')
-        self.parser.add_argument('-d', '--min-depth', help='sets minimum boundary for depth value, default = 40',
-                                 type=int, default=40)
-        self.parser.add_argument('-D', '--max-depth', help='sets maximum boundary for depth value, default = 10000',
-                                 type=int, default=10000)
-        self.parser.add_argument('-n', '--min_num',
-                                 help='sets minimum boundary for number of iterations per bit, default = 50', type=int,
-                                 default=50)
-        self.parser.add_argument('-N', '--max_num',
-                                 help='sets maximum boundary for number of iterations per bit, default = 300', type=int,
-                                 default=300)
-        self.parser.add_argument('--depth',
-                                 help='(advanced) sets recursion depth of algorithm, -1 = infinity',
-                                 type=int, default=-2)
-        self.parser.add_argument('--num', help='(advanced) sets number of iterations per bit',
-                                 type=int, default=-2)
         self.parser.add_argument('-o', '--out', help='name of output file, default=decoded.txt', default='decoded.txt',
                                  type=str)
         self.parser.add_argument('-i', '--input', help='name of input file to be encoded, default=encoded.txt',default='encoded.txt',type=str)
-        self.parser.add_argument('-r', '--randomizer',
-                                 help='(advanced) sets random generator to encode text, 1 - Python random library, 2 - Mersenne Twister by yinengy, default =2',
-                                 choices=[1, 2], default=2)
         self.parser.add_argument('key', help='key for cipher')
         self.parser.add_argument('--version', help='prints version of script')
 
@@ -78,36 +49,16 @@ class Decoder:
         self.args = args
         args = self.parser.parse_args(args[1:])
         if args.version:
-            print('Decoder version: 1.1')
+            print('Decoder version: 2.0')
             exit(0)
-        self.random_ch = args.randomizer
-        self.random_choice(self.random_ch)
-        self.verbose = args.verbose
-        self.set_max_depth(args.depth,(args.min_depth,args.max_depth))
+        self.random = RandomClass.Random()
         self.set_key(args.key)
-        self.set_min_num(args.num,(args.min_num,args.max_num))
+        self.verbose = args.verbose
         self.output_file = args.out
         if not args.input:
             print("No data to be decoded was provided")
             exit(-1)
         self.parse_file(args.input)
-        """
-                for i in range(len(self.args)):
-            if self.args[i] == '-k':
-                self.key = self.args[i + 1]
-            elif self.args[i] == '-I':
-                self.parse_input_file(self.args[i + 1])
-            elif self.args[i] == '-f':
-                self.parse_file(self.args[i + 1])
-            elif self.args[i] == '-d':
-                self.max_depth = int(self.args[i + 1])
-            elif self.args[i] == '-m':
-                self.min_num = int(self.args[i + 1])
-            elif self.args[i] == '-r':
-                self.random_ch = self.args[i + 1]
-            elif self.args[i] == '-o':
-                self.output_file = self.args[i + 1]
-        """
         if self.verbose:
             print('Arguments are parsed. Parsing file.')
 
@@ -135,20 +86,45 @@ class Decoder:
         self.file_data = open(file, 'rb').read()
 
 
-    def random_choice(self, num):
-        if int(num) == 1:
-            self.random = random.random()
-            self.random.seed(self.key)
-        elif int(num) == 2:
-            self.random = RandomClass.Random()
-            self.random.seed(int(self.key))
-        else:
-            self.random = RandomClass.Random()
-            self.random.seed(int(self.key))
 
     def decode_file_data(self):
         i = 0
         temp = 0
+        temp2 = 0
+        # parse min depth
+        while self.file_data[i] != 255:
+            temp += self.file_data[i]
+            i += 1
+        i += 1 # 255
+        temp += self.file_data[i]
+        i += 1
+        # parse max depth
+        while self.file_data[i] != 255:
+            temp2 += self.file_data[i]
+            i += 1
+        i += 1  # 255
+        temp2 += self.file_data[i]
+        i += 1
+        self.set_max_depth(-2,(temp,temp2))
+        temp = 0
+        temp2 = 0
+        # parse min num
+        while self.file_data[i] != 255:
+            temp += self.file_data[i]
+            i += 1
+        i += 1  # 255
+        temp += self.file_data[i]
+        i += 1
+        # parse max num
+        while self.file_data[i] != 255:
+            temp2 += self.file_data[i]
+            i += 1
+        i += 1  # 255
+        temp2 += self.file_data[i]
+        i += 1
+        self.set_min_num(-2, (temp, temp2))
+        # parse len of text
+        temp=0
         while self.file_data[i] != 255:
             temp += self.file_data[i]
             i += 1
@@ -162,7 +138,6 @@ class Decoder:
                 for w in range(8):
                     self.grid[j][h].append(self.file_data[i + j * 64 + h * 8 + w])
         i += temp * 64
-
         while i < len(self.file_data):
             temp = self.min_num
             while self.file_data[i] != 255:
